@@ -1,0 +1,192 @@
+package caliper
+
+import (
+	"fmt"
+	"strings"
+	"time"
+	
+	"github.com/google/uuid"
+	
+	"github.com/corey/zoom-caliper/internal/zoom"
+)
+
+// ZoomMapper maps Zoom events to Caliper events
+type ZoomMapper struct {
+	sourceID string
+}
+
+// NewZoomMapper creates a new Zoom to Caliper event mapper
+func NewZoomMapper(sourceID string) *ZoomMapper {
+	return &ZoomMapper{
+		sourceID: sourceID,
+	}
+}
+
+// MapToCaliperEvent maps a Zoom event to a Caliper event
+func (m *ZoomMapper) MapToCaliperEvent(event *zoom.Event, contextID string) (*Event, error) {
+	// Validate event data
+	if event.Event == "" {
+		return nil, fmt.Errorf("empty event type")
+	}
+	
+	if event.Payload == nil {
+		return nil, fmt.Errorf("missing event payload")
+	}
+	
+	if event.Payload.Object == nil {
+		return nil, fmt.Errorf("missing event object")
+	}
+	
+	if event.Payload.Object.ID == "" {
+		return nil, fmt.Errorf("missing meeting ID")
+	}
+	
+	if event.Payload.Object.Topic == "" {
+		return nil, fmt.Errorf("missing meeting topic")
+	}
+	
+	// Create base event data
+	eventTime := time.Now().UTC().Format(time.RFC3339)
+	if event.EventTs > 0 {
+		eventTime = time.Unix(0, event.EventTs*int64(time.Millisecond)).UTC().Format(time.RFC3339)
+	}
+	
+	caliperEvent := &Event{
+		ID:        fmt.Sprintf("urn:uuid:%s", uuid.New().String()),
+		Type:      "SessionEvent",
+		EventTime: eventTime,
+		Source: Source{
+			ID: m.sourceID,
+		},
+		Object: Object{
+			ID:   event.Payload.Object.ID,
+			Type: "Session",
+			Name: event.Payload.Object.Topic,
+			IsPartOf: IsPartOf{
+				ID:   contextID,
+				Type: "CourseSection",
+			},
+		},
+	}
+	
+	// Map different event types
+	switch event.Event {
+	case "meeting.started":
+		caliperEvent.Action = "Started"
+		return caliperEvent, nil
+	
+	case "meeting.ended":
+		caliperEvent.Action = "Ended"
+		return caliperEvent, nil
+	
+	case "meeting.participant_joined":
+		if event.Payload.Object.Participant == nil {
+			return nil, fmt.Errorf("missing participant data")
+		}
+		
+		participant := event.Payload.Object.Participant
+		// Check for valid user identification - prefer participant_user_id, fall back to user_id, then id
+		userID := participant.ParticipantUserID
+		if userID == "" {
+			userID = participant.UserID
+		}
+		if userID == "" {
+			userID = participant.ID
+		}
+		
+		if userID == "" || participant.UserName == "" {
+			return nil, fmt.Errorf("incomplete participant data")
+		}
+		
+		// Set participant as the actor
+		caliperEvent.Action = "LoggedIn"
+		caliperEvent.Actor = Actor{
+			ID:   userID,
+			Type: "Person",
+			Name: participant.UserName,
+		}
+		
+		return caliperEvent, nil
+	
+	case "meeting.participant_left":
+		if event.Payload.Object.Participant == nil {
+			return nil, fmt.Errorf("missing participant data")
+		}
+		
+		participant := event.Payload.Object.Participant
+		// Check for valid user identification - prefer participant_user_id, fall back to user_id, then id
+		userID := participant.ParticipantUserID
+		if userID == "" {
+			userID = participant.UserID  
+		}
+		if userID == "" {
+			userID = participant.ID
+		}
+		
+		if userID == "" || participant.UserName == "" {
+			return nil, fmt.Errorf("incomplete participant data")
+		}
+		
+		// Set participant as the actor
+		caliperEvent.Action = "LoggedOut"
+		caliperEvent.Actor = Actor{
+			ID:   userID,
+			Type: "Person",
+			Name: participant.UserName,
+		}
+		
+		return caliperEvent, nil
+		
+	default:
+		return nil, fmt.Errorf("unsupported event type: %s", event.Event)
+	}
+}
+
+// Event represents a Caliper event
+type Event struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Action    string    `json:"action"`
+	EventTime string    `json:"eventTime"`
+	Actor     Actor     `json:"actor,omitempty"`
+	Object    Object    `json:"object"`
+	Source    Source    `json:"source"`
+}
+
+// Actor represents a Caliper actor
+type Actor struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
+// Object represents a Caliper object
+type Object struct {
+	ID       string   `json:"id"`
+	Type     string   `json:"type"`
+	Name     string   `json:"name"`
+	IsPartOf IsPartOf `json:"isPartOf"`
+}
+
+// IsPartOf represents a Caliper isPartOf relationship
+type IsPartOf struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+// Source represents a Caliper source
+type Source struct {
+	ID string `json:"id"`
+}
+
+// ExtractLTIID extracts LTI ID from a meeting topic
+func ExtractLTIID(topic string) string {
+	if strings.Contains(topic, "[LTI-") {
+		start := strings.Index(topic, "[LTI-")
+		end := strings.Index(topic[start:], "]")
+		if end > 0 {
+			return topic[start+5 : start+end]
+		}
+	}
+	return ""
+} 

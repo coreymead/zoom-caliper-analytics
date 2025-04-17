@@ -1,0 +1,74 @@
+package types
+
+// ZoomCaliperEvent represents a Zoom event in a format that can be mapped to Caliper
+type ZoomCaliperEvent struct {
+	Event   string                 `json:"event"`
+	Payload map[string]interface{} `json:"payload"`
+	EventTs int64                  `json:"event_ts"`
+	
+	// Extracted structured data
+	Object *MeetingObject `json:"-"`
+}
+
+// MeetingObject represents a Zoom meeting object
+type MeetingObject struct {
+	ID         string      `json:"id"`
+	UUID       string      `json:"uuid"`
+	HostID     string      `json:"host_id"`
+	Topic      string      `json:"topic"`
+	Type       int         `json:"type"`
+	StartTime  string      `json:"start_time"`
+	Duration   int         `json:"duration"`
+	Timezone   string      `json:"timezone"`
+	Participant Participant `json:"participant,omitempty"`
+}
+
+// Participant represents a Zoom meeting participant
+type Participant struct {
+	UserID           string `json:"user_id"`
+	ParticipantUserID string `json:"participant_user_id"`
+	UserName         string `json:"user_name"`
+	Email            string `json:"email"`
+	JoinTime         string `json:"join_time,omitempty"`
+	LeaveTime        string `json:"leave_time,omitempty"`
+	ParticipantUUID  string `json:"participant_uuid"`
+	ID               string `json:"id"`
+	LeaveReason      string `json:"leave_reason,omitempty"`
+}
+
+// Actor represents a Caliper actor
+type Actor struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
+// Object represents a Caliper object
+type Object struct {
+	ID       string   `json:"id"`
+	Type     string   `json:"type"`
+	Name     string   `json:"name"`
+	IsPartOf IsPartOf `json:"isPartOf"`
+}
+
+// IsPartOf represents a Caliper isPartOf relationship
+type IsPartOf struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+// Source represents a Caliper source
+type Source struct {
+	ID string `json:"id"`
+}
+
+// CaliperEvent represents a generic Caliper event
+type CaliperEvent struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Action    string    `json:"action"`
+	EventTime string    `json:"eventTime"`
+	Actor     Actor     `json:"actor,omitempty"`
+	Object    Object    `json:"object"`
+	Source    Source    `json:"source"`
+} 

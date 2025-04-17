@@ -1,0 +1,154 @@
+package zoom
+
+import (
+	"testing"
+	"time"
+
+	"github.com/corey/zoom-caliper/internal/caliper"
+	"github.com/corey/zoom-caliper/internal/types"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestMapMeetingStartedToCaliper(t *testing.T) {
+	// Create a mock meeting event
+	event := &Event{
+		AccountID: "ABC123",
+		Payload: Payload{
+			Object: MeetingObject{
+				ID:    "12345",
+				UUID:  "abcdef123456",
+				Topic: "Test Meeting",
+				StartTime: time.Date(2023, 10, 15, 14, 0, 0, 0,
+					time.UTC).Format(time.RFC3339),
+				Duration: 60,
+				Host: Host{
+					ID:    "host123",
+					Email: "host@example.com",
+				},
+			},
+		},
+	}
+
+	// Mock the token store and client
+	mockTokenStore := NewMockTokenStore()
+	mockToken := CreateMockToken()
+	mockTokenStore.SaveToken(mockToken)
+
+	// Mock the user details lookup function
+	originalGetUserDetails := getUserDetailsForTesting
+	defer func() {
+		getUserDetailsForTesting = originalGetUserDetails
+	}()
+
+	getUserDetailsForTesting = func(client *Client, userID string, email string) UserWithLTI {
+		return UserWithLTI{
+			ID:    userID,
+			Email: email,
+			LTI: LTIUser{
+				ID: "lti_user_123",
+			},
+		}
+	}
+
+	client := &Client{
+		tokenStore: mockTokenStore,
+		baseURL:    "https://api.zoom.us/v2",
+	}
+
+	// Call the mapping function
+	caliperEvent, err := mapMeetingStartedToCaliper(client, event)
+
+	// Assert no error
+	assert.NoError(t, err)
+	
+	// Assert the event properties
+	assert.Equal(t, "SessionEvent", caliperEvent.Type)
+	assert.Equal(t, "Started", caliperEvent.Action)
+	assert.Equal(t, "zoom:meeting:12345", caliperEvent.Object.ID)
+	assert.Equal(t, "Test Meeting", caliperEvent.Object.Name)
+	assert.Equal(t, "VideoConference", caliperEvent.Object.Type)
+	assert.Equal(t, "lis:person:lti_user_123", caliperEvent.Actor.ID)
+	assert.Equal(t, "host@example.com", caliperEvent.Actor.Name)
+	
+	// Assert the generated date is in the correct format (RFC3339)
+	_, err = time.Parse(time.RFC3339, caliperEvent.EventTime)
+	assert.NoError(t, err)
+	
+	// Check that federation identifier is set correctly
+	assert.Equal(t, "zoom:account:ABC123", caliperEvent.FederatedSession.ID)
+}
+
+func TestMapMeetingEndedToCaliper(t *testing.T) {
+	// Create a mock meeting event
+	event := &Event{
+		AccountID: "ABC123",
+		Payload: Payload{
+			Object: MeetingObject{
+				ID:    "12345",
+				UUID:  "abcdef123456",
+				Topic: "Test Meeting",
+				StartTime: time.Date(2023, 10, 15, 14, 0, 0, 0,
+					time.UTC).Format(time.RFC3339),
+				EndTime: time.Date(2023, 10, 15, 15, 0, 0, 0,
+					time.UTC).Format(time.RFC3339),
+				Duration: 60,
+				Host: Host{
+					ID:    "host123",
+					Email: "host@example.com",
+				},
+			},
+		},
+	}
+
+	// Mock the token store and client
+	mockTokenStore := NewMockTokenStore()
+	mockToken := CreateMockToken()
+	mockTokenStore.SaveToken(mockToken)
+
+	// Mock the user details lookup function
+	originalGetUserDetails := getUserDetailsForTesting
+	defer func() {
+		getUserDetailsForTesting = originalGetUserDetails
+	}()
+
+	getUserDetailsForTesting = func(client *Client, userID string, email string) UserWithLTI {
+		return UserWithLTI{
+			ID:    userID,
+			Email: email,
+			LTI: LTIUser{
+				ID: "lti_user_123",
+			},
+		}
+	}
+
+	client := &Client{
+		tokenStore: mockTokenStore,
+		baseURL:    "https://api.zoom.us/v2",
+	}
+
+	// Call the mapping function
+	caliperEvent, err := mapMeetingEndedToCaliper(client, event)
+
+	// Assert no error
+	assert.NoError(t, err)
+	
+	// Assert the event properties
+	assert.Equal(t, "SessionEvent", caliperEvent.Type)
+	assert.Equal(t, "Ended", caliperEvent.Action)
+	assert.Equal(t, "zoom:meeting:12345", caliperEvent.Object.ID)
+	assert.Equal(t, "Test Meeting", caliperEvent.Object.Name)
+	assert.Equal(t, "VideoConference", caliperEvent.Object.Type)
+	assert.Equal(t, "lis:person:lti_user_123", caliperEvent.Actor.ID)
+	assert.Equal(t, "host@example.com", caliperEvent.Actor.Name)
+	
+	// Check that endedAtTime is set
+	_, ok := caliperEvent.Object["endedAtTime"]
+	assert.True(t, ok, "endedAtTime should be present in the object")
+	
+	// Assert the generated date is in the correct format (RFC3339)
+	_, err = time.Parse(time.RFC3339, caliperEvent.EventTime)
+	assert.NoError(t, err)
+	
+	// Check that federation identifier is set correctly
+	assert.Equal(t, "zoom:account:ABC123", caliperEvent.FederatedSession.ID)
+} 

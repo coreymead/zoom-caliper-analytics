@@ -1,0 +1,36 @@
+# Git and version control
+.git
+.gitignore
+
+# Environment files
+.env
+*.env
+
+# Certificates
+*.pem
+certs/
+
+# Logs
+*.log
+
+# Build artifacts
+bin/
+dist/
+
+# Test files
+*_test.go
+*/*/test/
+
+# Docker files (not needed in the build context)
+Dockerfile
+.dockerignore
+
+# Editor configurations
+.vscode/
+.idea/
+
+# Go build cache and modules
+vendor/
+
+# Token files and other runtime data
+tokens/ 

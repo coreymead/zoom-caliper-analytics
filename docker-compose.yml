@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  zoom-caliper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zoom-caliper
+    ports:
+      - "8080:8080"  # HTTP port
+      - "8443:8443"  # HTTPS port
+    environment:
+      - ZOOM_CLIENT_ID=${ZOOM_CLIENT_ID}
+      - ZOOM_CLIENT_SECRET=${ZOOM_CLIENT_SECRET}
+      - ZOOM_WEBHOOK_SECRET=${ZOOM_WEBHOOK_SECRET}
+      - USE_TEST_CLIENT=${USE_TEST_CLIENT:-true}
+    volumes:
+      - ./certs:/app/certs  # Mount certificates directory
+      - ./tokens:/app/tokens  # Mount tokens directory for persistence
+    restart: unless-stopped
+    networks:
+      - zoom-network
+
+networks:
+  zoom-network:
+    driver: bridge 
