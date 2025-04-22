@@ -19,6 +19,7 @@ type Config struct {
 	OAuthConfig       *zoom.OAuthConfig
 	TokenStore        zoom.TokenStore
 	CaliperClient     types.CaliperClient
+	EventStore        types.EventStore
 	Port              int
 	WebhookPath       string
 	ListenAddr        string
@@ -49,6 +50,7 @@ func NewServer(config *Config) *Server {
 	router.GET("/oauth/authorize", server.handleOAuthAuthorize)
 	router.GET("/oauth/callback", server.handleOAuthCallback)
 	router.GET("/user", server.handleUser)
+	router.GET("/caliper-events.json", server.handleCaliperEvents)
 
 	return server
 }
@@ -120,7 +122,7 @@ func (s *Server) handleWebhook(c *gin.Context) {
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
 	
 	// Process webhook
-	zoom.HandleWebhook(c, s.zoomClient, s.config.TokenStore)
+	zoom.HandleWebhook(c, s.zoomClient, s.config.TokenStore, s.config.EventStore)
 }
 
 func (s *Server) handleOAuthAuthorize(c *gin.Context) {
@@ -215,4 +217,9 @@ func (s *Server) handleUser(c *gin.Context) {
 		</body>
 	</html>
 	`, user.FirstName, user.LastName, user.Email, user.ID, user.RoleName, user.Status))
+}
+
+func (s *Server) handleCaliperEvents(c *gin.Context) {
+	events := s.config.EventStore.GetEvents()
+	c.JSON(http.StatusOK, events)
 } 

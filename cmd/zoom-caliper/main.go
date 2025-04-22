@@ -10,6 +10,7 @@ import (
 	"github.com/corey/zoom-caliper/internal/server"
 	"github.com/corey/zoom-caliper/internal/zoom"
 	"github.com/joho/godotenv"
+	"github.com/corey/zoom-caliper/internal/types"
 )
 
 // MockTokenStore implements a simple token store for testing
@@ -117,6 +118,7 @@ func main() {
 	config := &server.Config{
 		ZoomWebhookSecret: os.Getenv("ZOOM_WEBHOOK_SECRET"),
 		Port:             8080,
+		EventStore:       types.NewMemoryEventStore(),
 	}
 
 	// Validate required configuration

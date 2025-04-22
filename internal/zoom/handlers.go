@@ -169,7 +169,7 @@ func HandleMeetingEnded(event *Event) (*MeetingEndedEvent, error) {
 	return &meetingEvent, nil
 }
 
-func HandleWebhook(c *gin.Context, client *Client, tokenStore TokenStore) {
+func HandleWebhook(c *gin.Context, client *Client, tokenStore TokenStore, eventStore types.EventStore) {
 	var event types.ZoomEvent
 	
 	// Get the raw body to log
@@ -443,6 +443,12 @@ func HandleWebhook(c *gin.Context, client *Client, tokenStore TokenStore) {
 		log.Printf("ERROR: Failed to map event: %v", err)
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Store the event in the event store
+	if err := eventStore.StoreEvent(caliperEvent); err != nil {
+		log.Printf("ERROR: Failed to store event: %v", err)
+		// Continue processing even if storage fails
 	}
 
 	// Log the final Caliper event before sending
